@@ -93,4 +93,10 @@ export class Datatype2Controller {
   async getDetails() {
     return await this.datatype2Service.getDetails();
   }
+
+  @Patch('details')
+  async patchDetails(@Body() dto: { state: number }) {
+    return await this.datatype2Service.patchDetails(dto.state);
+  }
+  
 }

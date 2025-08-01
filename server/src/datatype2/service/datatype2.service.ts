@@ -1,124 +1,204 @@
+// server/src/datatype2/service/datatype2.service.ts
 import { Injectable } from '@nestjs/common';
 import { EthersService } from '../../ethers/ethers.service';
 import { exceptions } from '../../exceptions/exception.config';
+import { isBytesLike, toUtf8Bytes, encodeBytes32String } from 'ethers';
+
 
 @Injectable()
 export class Datatype2Service {
   constructor(private readonly ethersService: EthersService) {}
 
+  private async getDatatype2Contract() {
+    // EthersService의 getContract 메서드를 호출하여 DataType2 컨트랙트 인스턴스를 가져옵니다.
+    return await this.ethersService.getContract('DataType2');
+  }
+
   async message(newMessage?: string) {
     try {
-      // Todo: newMessage 유무에 따라 getMessage와 setMessage의 값을 리턴합니다.
+      const contract = await this.getDatatype2Contract();
+      if (newMessage !== undefined) {
+        const tx = await contract.setMessage(newMessage);
+        await tx.wait();
+        return await contract.getMessage();
+      } else {
+        return await contract.getMessage();
+      }
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
-  async number(index?: number, number?: number) {
+  async number(index?: number, inputNumber?: number) {
     try {
-      // Todo: index와 number 유무에 따라 getNumber와 addNumber의 값을 리턴합니다.
-      // index => getNumber 실행
-      // number => addNumber 실행
+      const contract = await this.getDatatype2Contract();
+      if (index !== undefined) {
+        return await contract.getNumber(index);
+      } else if (inputNumber !== undefined) {
+        const tx = await contract.addNumber(inputNumber);
+        await tx.wait();
+        return await contract.getNumbers();
+      }
+      return null;
     } catch (error) {
-      /*
-        Todo: 스마트 컨트랙트에서 발생한 오류 유형에 따라 예외를 정의합니다.
-
-        - 예외: 컨트랙트에서 에러 처리를 응답으로 반환
-          → getNumber 함수 호출 시 존재하지 않는 index의 에러로 "Index out of bounds"가 반환된 경우
-          → exceptions.INDEX_OUT_OF_BOUNDS 반환
-
-          예시:
-          error.reason === "Index out of bounds"
-
-        - 예외: 그 외 오류들
-          → exceptions.createBadRequestException(error.message)
-      */
+      if (error.reason && error.reason.includes("Index out of bounds")) {
+        throw exceptions.INDEX_OUT_OF_BOUNDS;
+      }
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async numbers() {
     try {
-      // Todo: getNumbers의 값을 리턴합니다.
-      // ⚠️ bigint 타입은 JSON으로 변환 시 string으로 변환 필요
+      const contract = await this.getDatatype2Contract();
+      const result = await contract.getNumbers();
+      return result.map((num: bigint) => num.toString());
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async addName(name: string) {
     try {
-      // Todo: addName의 값을 리턴합니다.
+      const contract = await this.getDatatype2Contract();
+      const tx = await contract.addName(name);
+      await tx.wait();
+      return await contract.getNames();
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async names() {
     try {
-      // Todo: getNames의 값을 리턴합니다.
+      const contract = await this.getDatatype2Contract();
+      return await contract.getNames();
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async balance(address: string, value?: number) {
     try {
-      // Todo: value의 유무에 따라 getBalance과 setBalance의 값을 리턴합니다.
+      const contract = await this.getDatatype2Contract();
+      if (value !== undefined) {
+        const tx = await contract.setBalance(address, value);
+        await tx.wait();
+        return await contract.getBalance(address);
+      } else {
+        return await contract.getBalance(address);
+      }
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async user(address: string, name?: string, age?: number) {
-    // Todo: setUser를 실행 시 name이 빈 문자열로 들어올 경우, exceptions.NAME_CANNOT_BE_EMPTY 에러를 반환합니다.
+    if (name !== undefined && name.trim() === '') {
+      throw exceptions.NAME_CANNOT_BE_EMPTY;
+    }
 
     try {
-      // Todo: name, age 유무에 따라 getUser와 setUser의 값을 리턴합니다.
-      // ⚠️ bigint 타입은 JSON으로 변환 시 string으로 변환 필요
+      const contract = await this.getDatatype2Contract();
+      if (name !== undefined && age !== undefined) {
+        const tx = await contract.setUser(address, name, age);
+        await tx.wait();
+        const [userName, userAge] = await contract.getUser(address);
+        return { name: userName, age: userAge.toString() };
+      } else {
+        const [userName, userAge] = await contract.getUser(address);
+        return { name: userName, age: userAge.toString() };
+      }
     } catch (error) {
-      /*
-        Todo: 스마트 컨트랙트에서 발생한 오류 유형에 따라 예외를 정의합니다.
-
-        - 예외: 컨트랙트에서 에러 처리를 응답으로 반환
-          → getUser 함수 호출 시 존재하지 않는 user의 에러로 "User not found"가 반환된 경우
-          → exceptions.USER_NOT_FOUND 반환
-
-          예시:
-          error.reason === "User not found"
-
-        - 예외: 그 외 오류들
-          → exceptions.createBadRequestException(error.message)
-      */
+      if (error.reason && error.reason.includes("User not found")) {
+        throw exceptions.USER_NOT_FOUND;
+      }
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async fixedData(data?: string) {
     try {
-      // Todo: data 유무에 따라 getFixedData와 setFixedData의 값을 리턴합니다.
-      // ⚠️ data가 byte 형의 데이터인지 확인해야 합니다.(isBytesLike)
-      // ⚠️ (byte형이 아닐 시) string -> bytes32(encodeBytes32String)
-      // ⚠️ data의 길이는 32바이트로 패딩해야 합니다.(zeroPadValue32)
+      const contract = await this.getDatatype2Contract();
+      if (data !== undefined) {
+        let bytes32Data: string;
+        if (isBytesLike(data)) {
+            bytes32Data = data;
+        } else {
+            bytes32Data = encodeBytes32String(data);
+        }
+
+        const tx = await contract.setFixedData(bytes32Data);
+        await tx.wait();
+        return await contract.getFixedData();
+      } else {
+        return await contract.getFixedData();
+      }
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async dynamicData(data?: string) {
     try {
-      // Todo: data 유무에 따라 getDynamicData와 setDynamicData의 값을 리턴합니다.
-      // ⚠️ data가 byte 형의 데이터인지 확인해야 합니다.(isBytesLike)
-      // ⚠️ (byte형이 아닐 시) string -> bytes(toUtf8Bytes)
+      const contract = await this.getDatatype2Contract();
+      if (data !== undefined) {
+        let bytesData: Uint8Array | string;
+        if (isBytesLike(data)) {
+            bytesData = data;
+        } else {
+            bytesData = toUtf8Bytes(data);
+        }
+
+        const tx = await contract.setDynamicData(bytesData);
+        await tx.wait();
+        return await contract.getDynamicData();
+      } else {
+        return await contract.getDynamicData();
+      }
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 
   async getDetails() {
     try {
-      // Todo: getDetails의 값을 리턴해야 합니다.
-      // ⚠️ bigint 타입은 JSON으로 변환 시 string으로 변환 필요
+      const contract = await this.getDatatype2Contract();
+      const result = await contract.getDetails();
+      return {
+        message: result[0],
+        numbers: result[1].map((num: bigint) => num.toString()),
+        names: result[2],
+        fixedData: result[3],
+        dynamicData: result[4],
+      };
     } catch (error) {
-      //  Todo: 에러를 응답합니다.(exceptions.createBadRequestException(error.message))
+      throw exceptions.createBadRequestException(error.message);
+    }
+  }
+
+  async patchDetails(state: number) {
+    try {
+      const contract = await this.getDatatype2Contract();
+      // 이 함수는 'state'를 인자로 받지만, Datatype2 컨트랙트에는 'setState' 같은 함수가 없습니다.
+      // 이 부분은 Postman의 요청 바디와 연결된 것으로 보입니다.
+      // 만약 'state' 값을 사용하는 컨트랙트 함수가 있다면, 아래 주석을 해제하고 사용합니다.
+      // 예시: const tx = await contract.setState(state);
+      // await tx.wait();
+
+      const result = await contract.getDetails();
+      // getDetails 함수와 마찬가지로 객체 형태로 반환하도록 변경합니다.
+      return {
+        message: result[0],
+        numbers: result[1].map((num: bigint) => num.toString()),
+        names: result[2],
+        fixedData: result[3],
+        dynamicData: result[4],
+      };
+    } catch (error) {
+      throw exceptions.createBadRequestException(error.message);
     }
   }
 }
+
+

@@ -6,7 +6,9 @@ async function main() {
 
   console.log(`Deploying contracts with the account: ${deployer.address}`);
 
-  // Todo: deploy script를 구현하여 주세요.
+  const DataType2 = await ethers.getContractFactory('DataType2');
+  const contract = await DataType2.deploy();
+  await contract.waitForDeployment();
 
   console.log(`DataType2 contract deployed at: ${contract.target}`);
   await makeAbi('DataType2', contract.target);
